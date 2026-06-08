@@ -1,0 +1,190 @@
+# Airspace Guard Configuration
+# Customize for your uConsole + AIoV2 setup
+
+# System
+system:
+  log_level: "INFO"              # DEBUG, INFO, WARNING, ERROR
+  log_file: "/var/log/airspace-guard.log"
+  database: "/var/lib/airspace-guard/airspace.db"
+  pid_file: "/run/airspace-guard.pid"
+  user: "airspace"              # User to run service as
+  group: "airspace"
+
+# WiFi Drone Detection (AC1200 in monitor mode)
+wifi:
+  enabled: true
+  interface: "wlan0"             # Change to your AC1200 interface name
+  channel_dwell_time: 100        # milliseconds per channel
+  scan_cycle_time: 1000          # Total time for one full scan cycle
+  channels_2ghz: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
+  channels_5ghz: [36, 40, 44, 48, 52, 56, 60, 64, 100, 104, 108, 112, 116, 120, 124, 128, 132, 136, 140, 144, 149, 153, 157, 161, 165]
+  channels_to_scan: [1, 6, 11]   # Primary channels for faster scanning (start with these)
+  rssi_threshold: -85            # dBm - minimum signal strength to report
+  
+  # Buffer settings
+  packet_buffer_size: 1000
+  packet_timeout: 5              # seconds
+
+# ADS-B Aircraft Detection (via readsb)
+ads_b:
+  enabled: true
+  host: "127.0.0.1"
+  port: 30003                    # readsb raw JSON port
+  connection_timeout: 5          # seconds
+  reconnect_interval: 10         # seconds
+  max_range: 150                 # miles
+  min_altitude: 100              # feet (filter out noise)
+  update_interval: 5             # seconds between requests
+  
+  # Alert thresholds
+  alert_distance: 3.0            # miles - alert if aircraft closer
+  alert_altitude: 500            # feet - alert if below this
+
+# GPS & Geolocation (AIoV2 GPS module)
+gps:
+  enabled: true
+  device: "/dev/ttyUSB0"         # Serial port for GPS
+  baudrate: 115200               # Typical for AIoV2
+  timeout: 2                     # seconds
+  update_rate: 1                 # Hz
+  initialization_timeout: 30     # seconds to get first fix
+  
+  # If GPS not available, use static location (for testing)
+  fallback_lat: 0.0              # degrees
+  fallback_lon: 0.0
+  fallback_enabled: false        # Set true to use fallback
+
+# Drone Detection Engine
+drone_detection:
+  enabled: true
+  
+  # DJI specific settings
+  dji_enabled: true
+  detect_all_drones: false       # If false, only DJI; if true, flag unknown drones
+  
+  # Detection parameters
+  min_rssi: -85                  # dBm - minimum signal to consider
+  rssi_window: 5                 # samples for averaging
+  min_packets: 3                 # minimum packets to confirm detection
+  tracking_timeout: 30           # seconds - stop tracking if no new packets
+  
+  # DJI parameters
+  dji_rssi_threshold: -75        # dBm - detection threshold for DJI
+  dji_min_beacon_count: 2        # beacon frames required
+  
+  # Distance estimation (RSSI-based)
+  rssi_calibration: -40          # dBm at 1 meter (reference point)
+  path_loss_exponent: 2.0        # Free space = 2.0, indoor = 2.5-3.5
+  
+  # Alerts
+  alert_distance: 2.0            # miles - alert if drone closer
+  alert_enabled: true
+  alert_sound: true
+
+# SDR & Direction Finding (RTL-SDR via AIoV2)
+sdr:
+  enabled: true
+  
+  # RTL-SDR settings
+  device_index: 0                # First RTL-SDR device
+  frequency_hz: 1090000000       # 1090 MHz (ADS-B)
+  sample_rate: 2000000           # 2 MHz
+  gain: "auto"                   # auto, 0-49 for manual
+  
+  # Direction Finding
+  df_enabled: false              # Requires antenna array (advanced)
+  df_frequency: 2450000000       # 2.45 GHz (2.4G ISM band)
+  df_sample_rate: 4000000        # 4 MHz for better resolution
+
+# LoRa & Mesh Monitoring (SX1262 on AIoV2)
+lora:
+  enabled: false                 # Advanced feature
+  device: "/dev/ttyUSB1"
+  frequency: 915000000           # Hz (US) - change for your region
+  bandwidth: 125000              # Hz
+  spreading_factor: 7
+  coding_rate: "4/5"
+  monitoring_only: true          # Don't transmit
+
+# Web Dashboard
+web:
+  enabled: true
+  host: "0.0.0.0"               # Listen on all interfaces
+  port: 8000
+  debug: false                   # Set true only for development
+  threaded: true
+  
+  # Dashboard refresh
+  update_interval: 2             # seconds
+  max_history_points: 100        # Max data points to keep in memory
+  
+  # Map settings
+  map_provider: "OpenStreetMap"  # Leaflet tile provider
+  map_zoom: 12                   # Default zoom level
+  map_zoom_on_alert: 14          # Zoom in when alert triggered
+  
+  # API endpoints
+  cors_enabled: true
+  api_prefix: "/api"
+
+# Alerting System
+alerts:
+  enabled: true
+  
+  # Alert types
+  aircraft_alert: true
+  drone_alert: true
+  
+  # Notification methods
+  web_ui: true                   # Dashboard notification
+  sound: true                    # Beep/sound alert
+  log_file: true                 # Write to log
+  
+  # Sound settings
+  sound_device: "default"        # ALSA device
+  sound_volume: 80               # Percent
+  alert_sound_file: "/usr/share/sounds/freedesktop/stereo/alarm.oga"
+  
+  # Thresholds
+  aircraft_proximity_alert: 3.0  # miles
+  drone_proximity_alert: 2.0     # miles
+  aircraft_altitude_alert: 500   # feet
+
+# Database
+database:
+  type: "sqlite"
+  path: "/var/lib/airspace-guard/airspace.db"
+  
+  # Retention policy
+  retention_days: 30             # Keep 30 days of history
+  vacuum_frequency: 86400        # seconds (daily optimization)
+  
+  # Performance
+  batch_writes: true
+  batch_size: 100
+  flush_interval: 5              # seconds
+
+# Performance Tuning
+performance:
+  enable_memory_profiling: false
+  enable_cpu_profiling: false
+  
+  # Threading
+  detector_threads: 2
+  
+  # Caching
+  enable_caching: true
+  cache_ttl: 60                  # seconds
+
+# Advanced
+advanced:
+  # Experimental features
+  machine_learning_detection: false  # Requires ML model
+  
+  # Debug options
+  packet_capture: false          # Store captured packets
+  signal_recording: false        # Record raw samples
+  
+  # Custom MAC addresses to monitor
+  custom_mac_prefixes:
+    - "AA:BB:CC"  # Example custom drone

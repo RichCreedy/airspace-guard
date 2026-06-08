@@ -1,0 +1,53 @@
+[Unit]
+Description=Airspace Guard - Local Drone & Aircraft Tracking System
+Documentation=https://github.com/RichCreedy/airspace-guard
+After=network-online.target gpsd.service readsb.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=airspace
+Group=airspace
+WorkingDirectory=/var/lib/airspace-guard
+
+# Main process
+ExecStart=/usr/bin/python3 /opt/airspace-guard/src/airspace_guard.py
+
+# Pre-start setup (WiFi monitor mode)
+ExecStartPre=/usr/bin/python3 /opt/airspace-guard/src/setup_monitor_mode.py
+
+# Restart policy
+Restart=on-failure
+RestartSec=10s
+StartLimitInterval=60s
+StartLimitBurst=3
+
+# Process management
+KillMode=mixed
+KillSignal=SIGTERM
+KillTimeout=30s
+
+# Resource limits (for ARM system)
+LimitNOFILE=65536
+LimitNPROC=512
+CPUQuota=80%
+MemoryLimit=512M
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=airspace-guard
+
+# Security
+NoNewPrivileges=false
+PrivateTmp=true
+ProtectSystem=partial
+ProtectHome=yes
+ReadWritePaths=/var/lib/airspace-guard /run/airspace-guard
+
+# Environment
+Environment="PYTHONUNBUFFERED=1"
+Environment="TZ=UTC"
+
+[Install]
+WantedBy=multi-user.target
