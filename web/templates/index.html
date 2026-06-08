@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Airspace Guard - Local Airspace Monitor</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; overflow: hidden; }
+        #app { display: flex; height: 100vh; flex-direction: column; }
+        header { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); border-bottom: 1px solid #334155; padding: 1rem; display: flex; justify-content: space-between; align-items: center; }
+        .title { display: flex; align-items: center; gap: 1rem; }
+        .title h1 { font-size: 1.5rem; font-weight: 700; color: #06b6d4; }
+        .status-indicator { display: flex; gap: 0.5rem; align-items: center; }
+        .status-dot { width: 12px; height: 12px; border-radius: 50%; background: #10b981; box-shadow: 0 0 10px #10b981; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .main-container { display: flex; flex: 1; gap: 1rem; padding: 1rem; overflow: hidden; }
+        #map { flex: 1; border-radius: 8px; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        .sidebar { width: 350px; background: #1e293b; border-radius: 8px; border: 1px solid #334155; display: flex; flex-direction: column; overflow: hidden; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+        .sidebar-header { padding: 1rem; border-bottom: 1px solid #334155; background: #0f172a; }
+        .sidebar-header h2 { font-size: 1.1rem; color: #06b6d4; margin-bottom: 0.5rem; }
+        .sidebar-content { flex: 1; overflow-y: auto; padding: 1rem; }
+        .detection-item { background: #0f172a; border: 1px solid #334155; border-radius: 6px; padding: 1rem; margin-bottom: 0.75rem; }
+        .detection-item.drone { border-left: 4px solid #f59e0b; }
+        .detection-item.aircraft { border-left: 4px solid #3b82f6; }
+        .detection-item-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+        .detection-type { font-weight: 600; font-size: 0.9rem; text-transform: uppercase; }
+        .detection-type.drone { color: #f59e0b; }
+        .detection-type.aircraft { color: #3b82f6; }
+        .detection-distance { font-size: 0.85rem; color: #94a3b8; }
+        .detection-info { font-size: 0.85rem; color: #cbd5e1; line-height: 1.5; }
+        .detection-info-row { display: flex; justify-content: space-between; margin: 0.25rem 0; }
+        .detection-label { color: #94a3b8; }
+        .detection-value { color: #e2e8f0; font-weight: 500; }
+        .no-detections { text-align: center; color: #64748b; padding: 2rem 1rem; font-size: 0.9rem; }
+        ::-webkit-scrollbar { width: 6px; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
+        ::-webkit-scrollbar-thumb { background: #475569; border-radius: 3px; }
+    </style>
+</head>
+<body>
+    <div id="app">
+        <header>
+            <div class="title">
+                <h1>🛡️ Airspace Guard</h1>
+                <span style="color: #64748b;">Local Airspace Monitor</span>
+            </div>
+            <div class="status-indicator">
+                <span id="status-text" style="color: #94a3b8; font-size: 0.9rem;">Initializing...</span>
+                <div class="status-dot"></div>
+            </div>
+        </header>
+
+        <div class="main-container">
+            <div id="map"></div>
+            <div class="sidebar">
+                <div class="sidebar-header">
+                    <h2>📍 Detections</h2>
+                    <div style="font-size: 0.85rem; color: #94a3b8;">
+                        <span id="drone-count">0</span> drones • <span id="aircraft-count">0</span> aircraft
+                    </div>
+                </div>
+                <div class="sidebar-content" id="detections-list">
+                    <div class="no-detections"><div>📡</div><div>Scanning airspace...</div></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const map = L.map('map').setView([40, -74], 12);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+            maxZoom: 19,
+        }).addTo(map);
+
+        const droneMarkers = {};
+        const aircraftMarkers = {};
+
+        async function fetchAPI(endpoint) {
+            try {
+                const response = await fetch(`/api${endpoint}`);
+                return await response.json();
+            } catch (error) {
+                console.error(`API error: ${endpoint}`, error);
+                return null;
+            }
+        }
+
+        async function updateDetections() {
+            const data = await fetchAPI('/detections');
+            if (!data) return;
+
+            const dronesList = document.getElementById('detections-list');
+            const droneCount = document.getElementById('drone-count');
+            const aircraftCount = document.getElementById('aircraft-count');
+            const statusText = document.getElementById('status-text');
+
+            let html = '';
+            if (data.drones.length === 0 && data.aircraft.length === 0) {
+                html = '<div class="no-detections"><div>📡</div><div>Scanning airspace...</div></div>';
+                statusText.textContent = '✓ Online (no detections)';
+            } else {
+                statusText.textContent = `✓ Online (${data.drones.length} drones, ${data.aircraft.length} aircraft)`;
+            }
+
+            for (const drone of data.drones) {
+                html += `<div class="detection-item drone">
+                    <div class="detection-item-header">
+                        <span class="detection-type drone">🚁 ${drone.drone_type || 'Unknown'}</span>
+                        <span class="detection-distance">${drone.estimated_distance_miles?.toFixed(2) || 'N/A'} mi</span>
+                    </div>
+                    <div class="detection-info">
+                        <div class="detection-info-row">
+                            <span class="detection-label">MAC:</span>
+                            <span class="detection-value" style="font-family: monospace; font-size: 0.8rem;">${drone.mac_address}</span>
+                        </div>
+                        <div class="detection-info-row">
+                            <span class="detection-label">Signal:</span>
+                            <span class="detection-value">${drone.last_rssi_dbm?.toFixed(1) || 'N/A'} dBm</span>
+                        </div>
+                        <div class="detection-info-row">
+                            <span class="detection-label">Confidence:</span>
+                            <span class="detection-value">${(drone.confidence * 100).toFixed(0)}%</span>
+                        </div>
+                    </div>
+                </div>`;
+            }
+
+            for (const aircraft of data.aircraft) {
+                html += `<div class="detection-item aircraft">
+                    <div class="detection-item-header">
+                        <span class="detection-type aircraft">✈️ ${aircraft.callsign || aircraft.icao}</span>
+                        <span class="detection-distance">${aircraft.range_miles?.toFixed(2) || 'N/A'} mi</span>
+                    </div>
+                    <div class="detection-info">
+                        <div class="detection-info-row">
+                            <span class="detection-label">Altitude:</span>
+                            <span class="detection-value">${aircraft.altitude_ft?.toLocaleString() || 'N/A'} ft</span>
+                        </div>
+                        <div class="detection-info-row">
+                            <span class="detection-label">Speed:</span>
+                            <span class="detection-value">${aircraft.speed_knots || 'N/A'} kts</span>
+                        </div>
+                        <div class="detection-info-row">
+                            <span class="detection-label">Heading:</span>
+                            <span class="detection-value">${aircraft.heading_deg?.toFixed(0) || 'N/A'}°</span>
+                        </div>
+                    </div>
+                </div>`;
+            }
+
+            dronesList.innerHTML = html || '<div class="no-detections"><div>📡</div><div>Scanning airspace...</div></div>';
+            droneCount.textContent = data.drones.length;
+            aircraftCount.textContent = data.aircraft.length;
+        }
+
+        async function updateMap() {
+            const data = await fetchAPI('/detections');
+            if (!data) return;
+
+            for (const drone of data.drones) {
+                const key = drone.mac_address;
+                if (!droneMarkers[key]) {
+                    const marker = L.marker([Math.random() * 0.01 + 40, Math.random() * 0.01 - 74], {
+                        icon: L.icon({
+                            iconUrl: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%23f59e0b"><path d="M12 2l2 8h8l-6 4 2 8-8-6-8 6 2-8-6-4h8z"/></svg>',
+                            iconSize: [20, 20],
+                        })
+                    });
+                    marker.bindPopup(`<b>${drone.drone_type}</b><br>MAC: ${drone.mac_address}`);
+                    marker.addTo(map);
+                    droneMarkers[key] = marker;
+                }
+            }
+
+            for (const aircraft of data.aircraft) {
+                const key = aircraft.icao;
+                if (aircraft.latitude && aircraft.longitude) {
+                    if (!aircraftMarkers[key]) {
+                        const marker = L.marker([aircraft.latitude, aircraft.longitude], {
+                            icon: L.icon({
+                                iconUrl: 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="%233b82f6"><path d="M12 2l6 11h7l-6 4 3 10-10-8-10 8 3-10-6-4h7z"/></svg>',
+                                iconSize: [20, 20],
+                            })
+                        });
+                        marker.bindPopup(`<b>${aircraft.callsign || aircraft.icao}</b><br>Alt: ${aircraft.altitude_ft} ft`);
+                        marker.addTo(map);
+                        aircraftMarkers[key] = marker;
+                    } else {
+                        aircraftMarkers[key].setLatLng([aircraft.latitude, aircraft.longitude]);
+                    }
+                }
+            }
+        }
+
+        updateDetections();
+        updateMap();
+        setInterval(() => { updateDetections(); updateMap(); }, 2000);
+    </script>
+</body>
+</html>
