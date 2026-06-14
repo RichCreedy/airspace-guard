@@ -13,7 +13,7 @@ system:
 # WiFi Drone Detection (AC1200 in monitor mode)
 wifi:
   enabled: true
-  interface: "wlan0"             # Change to your AC1200 interface name
+  interface: "wlan1"             # Change to your AC1200 interface name
   channel_dwell_time: 100        # milliseconds per channel
   scan_cycle_time: 1000          # Total time for one full scan cycle
   channels_2ghz: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
@@ -60,7 +60,7 @@ drone_detection:
   
   # DJI specific settings
   dji_enabled: true
-  detect_all_drones: false       # If false, only DJI; if true, flag unknown drones
+  detect_all_drones: true       # If false, only DJI; if true, flag unknown drones
   
   # Detection parameters
   min_rssi: -85                  # dBm - minimum signal to consider
@@ -100,7 +100,7 @@ sdr:
 lora:
   enabled: false                 # Advanced feature
   device: "/dev/ttyUSB1"
-  frequency: 915000000           # Hz (US) - change for your region
+  frequency: 868000000           # Hz (US) - change for your region
   bandwidth: 125000              # Hz
   spreading_factor: 7
   coding_rate: "4/5"
