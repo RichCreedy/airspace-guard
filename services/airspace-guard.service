@@ -11,14 +11,16 @@ Group=airspace
 WorkingDirectory=/var/lib/airspace-guard
 
 # Main process
-ExecStart=/usr/bin/python3 /opt/airspace-guard/src/airspace_guard.py
+ExecStart=/home/{Username}/airspace-guard/venv/bin/python /home/{Username}/airspace-guard/src/setup-monitor-mode.py
+
 
 # Pre-start setup (WiFi monitor mode)
-ExecStartPre=/usr/bin/python3 /opt/airspace-guard/src/setup_monitor_mode.py
+ExecStartPre=/home/{Username}/airspace-guard/venv/bin/python /home/{Username}/airspace-guard/src/setup-monitor-mode.py
+
 
 # Restart policy
 Restart=on-failure
-RestartSec=10s
+RestartSec=30s
 StartLimitInterval=60s
 StartLimitBurst=3
 
@@ -31,7 +33,7 @@ KillTimeout=30s
 LimitNOFILE=65536
 LimitNPROC=512
 CPUQuota=80%
-MemoryLimit=512M
+MemoryMax=512M
 
 # Logging
 StandardOutput=journal
