@@ -36,8 +36,8 @@ pytz==2023.3
 
 # Optional: Real-time updates
 flask-socketio==5.3.0
-python-socketio==5.9.0
-python-engineio==4.5.1
+python-socketio==5.11.0
+python-engineio==4.9.0
 
 # Development (optional)
 # pytest==7.3.0
