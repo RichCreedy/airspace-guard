@@ -41,7 +41,7 @@ sudo apt-get install -y \
 
 echo -e "${YELLOW}[2/10] Installing Python 3 dependencies...${NC}"
 sudo pip3 install --upgrade pip setuptools wheel
-sudo pip3 install -r requirements.txt
+sudo pip3 install -r requirements.txt --break-system-packages
 
 echo -e "${YELLOW}[3/10] Creating system user...${NC}"
 if ! id -u airspace &> /dev/null; then
